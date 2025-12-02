@@ -2,9 +2,8 @@
 
 import { useState, useCallback } from "react";
 import { useDropzone } from "react-dropzone";
-import heicConvert from "heic-convert";
+import heic2any from "heic2any";
 import JSZip from "jszip";
-import { Buffer } from "buffer";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Upload,
@@ -34,9 +33,6 @@ interface FileItem {
 }
 
 export function Converter() {
-  if (typeof window !== "undefined") {
-    window.Buffer = window.Buffer || Buffer;
-  }
   const [files, setFiles] = useState<FileItem[]>([]);
   const [isConvertingAll, setIsConvertingAll] = useState(false);
 
@@ -69,22 +65,24 @@ export function Converter() {
       );
 
       const arrayBuffer = await fileItem.file.arrayBuffer();
-      const buffer = new Uint8Array(arrayBuffer);
-      
+      const header = new Uint8Array(arrayBuffer.slice(0, 16));
       console.log(
         "File header:",
-        Array.from(buffer.slice(0, 16))
+        Array.from(header)
           .map((b) => b.toString(16).padStart(2, "0"))
           .join(" ")
       );
 
-      const outputBuffer = await heicConvert({
-        buffer,
-        format: 'JPEG',
+      // Try passing the blob directly from array buffer
+      const blob = new Blob([arrayBuffer], { type: "image/heic" });
+
+      const result = await heic2any({
+        blob,
+        toType: "image/jpeg",
         quality: 0.9,
       });
 
-      const outputBlob = new Blob([new Uint8Array(outputBuffer)], { type: "image/jpeg" });
+      const outputBlob = Array.isArray(result) ? result[0] : result;
       const url = URL.createObjectURL(outputBlob);
       const convertedName = fileItem.file.name.replace(
         /\.(heic|heif)$/i,
